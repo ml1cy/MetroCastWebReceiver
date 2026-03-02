@@ -23,10 +23,7 @@
             color: var(--md-sys-color-on-background);
         }
 
-        /* NEST HUB FIX:
-           Google automatically injects massive <touch-controls> elements 
-           on Smart Displays with a z-index of 1,000,000. We explicitly destroy them here. 
-        */
+        /* Hide default Cast & Smart Display UI elements */
         cast-media-player, 
         touch-controls,
         goog-audio-player-compatibility {
@@ -38,12 +35,10 @@
             height: 0 !important;
             z-index: -1 !important;
             opacity: 0 !important;
-            pointer-events: none !important; /* Stops it from stealing touch events */
+            pointer-events: none !important;
         }
 
-        /* Our custom UI now uses the maximum 32-bit integer for z-index
-           to mathematically guarantee it sits above Google's 1,000,000 z-index.
-        */
+        /* Ensure custom UI is always on top */
         .custom-overlay {
             position: absolute;
             top: 0;
@@ -133,7 +128,7 @@
             opacity: 0.8;
         }
 
-        /* --- NEW PLAYBACK CONTROLS CSS --- */
+        /* Playback Controls */
         .controls-row {
             display: flex;
             justify-content: center;
@@ -177,7 +172,7 @@
         }
 
         .play-pause-btn:active {
-            background-color: #EADDFF; /* Lighter primary on press */
+            background-color: #EADDFF;
         }
 
         .play-pause-btn svg {
@@ -238,30 +233,39 @@
             const context = cast.framework.CastReceiverContext.getInstance();
             const playerManager = context.getPlayerManager();
 
-            // Listen for Track Changes 
+            // Track and State changes
             playerManager.addEventListener(
                 cast.framework.events.EventType.MEDIA_STATUS, (event) => {
-                    console.log("Metrolist Receiver: Received MEDIA_STATUS event", event);
+                    console.log("Metrolist Receiver: Received MEDIA_STATUS event");
                     
+                    // Update metadata
                     const mediaInfo = playerManager.getMediaInformation();
-                    
                     if (mediaInfo && mediaInfo.metadata) {
-                        console.log("Metrolist Receiver: Track Metadata extracted:", mediaInfo.metadata);
-                        
                         document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
                         document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
                         
                         if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
-                            console.log("Metrolist Receiver: Loading Album Art URL:", mediaInfo.metadata.images[0].url);
                             document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
                         }
+                    }
+
+                    // Update play/pause icon
+                    const state = playerManager.getPlayerState();
+                    const playIcon = document.getElementById('ui-icon-play');
+                    const pauseIcon = document.getElementById('ui-icon-pause');
+                    
+                    if (state === cast.framework.messages.PlayerState.PLAYING || 
+                        state === cast.framework.messages.PlayerState.BUFFERING) {
+                        playIcon.style.display = 'none';
+                        pauseIcon.style.display = 'block';
                     } else {
-                        console.warn("Metrolist Receiver: No metadata found in MEDIA_STATUS event.");
+                        playIcon.style.display = 'block';
+                        pauseIcon.style.display = 'none';
                     }
                 }
             );
 
-            // Listen for Playback Progress
+            // Playback progress
             playerManager.addEventListener(
                 cast.framework.events.EventType.TIME_UPDATE, (event) => {
                     const currentTime = event.currentMediaTime;
@@ -277,26 +281,7 @@
                 }
             );
 
-            // Listen for Play/Pause State
-            playerManager.addEventListener(
-                cast.framework.events.EventType.PLAYER_STATE_CHANGED, (event) => {
-                    console.log("Metrolist Receiver: Player state changed to", event.playerState);
-                    const state = event.playerState;
-                    const playIcon = document.getElementById('ui-icon-play');
-                    const pauseIcon = document.getElementById('ui-icon-pause');
-                    
-                    if (state === cast.framework.messages.PlayerState.PLAYING || 
-                        state === cast.framework.messages.PlayerState.BUFFERING) {
-                        playIcon.style.display = 'none';
-                        pauseIcon.style.display = 'block';
-                    } else {
-                        playIcon.style.display = 'block';
-                        pauseIcon.style.display = 'none';
-                    }
-                }
-            );
-
-            // Handle Play/Pause Button Click
+            // Controls
             document.getElementById('ui-btn-play-pause').addEventListener('click', () => {
                 const state = playerManager.getPlayerState();
                 console.log("Metrolist Receiver: Play/Pause clicked. Current state:", state);
@@ -329,25 +314,25 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
-            // Start the receiver context 
+            // Receiver context setup
             const options = new cast.framework.CastReceiverOptions();
             
-            // Disable the default timeout so the screen doesn't turn off if paused
+            // Disable idle timeout
             options.disableIdleTimeout = true;
             
-            // Tell Google we do NOT want the Smart Display Touch UI
+            // Disable Smart Display touch UI
             const uiConfig = new cast.framework.ui.UiConfig();
             uiConfig.touchScreenOptimizedApp = false;
             options.uiConfig = uiConfig;
             
-            // Set logging level so we can see framework internals in the console if needed
+            // Enable debug logging
             options.customNamespaces = Object.assign({});
             cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
             
             console.log("Metrolist Receiver: Starting context...");
             context.start(options);
 
-            // Erase all default Smart Display UI buttons just in case it still tries to load
+            // Clear default Smart Display slots
             try {
                 const controls = cast.framework.ui.Controls.getInstance();
                 controls.clearDefaultSlotAssignments();
