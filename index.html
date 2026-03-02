@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <title>Metrolist Cast Receiver</title>
     
     <style>
@@ -126,14 +127,55 @@
     </div>
 
     <script>
+const context = cast.framework.CastReceiverContext.getInstance();
+const playerManager = context.getPlayerManager();
 
-        console.log("Metrolist UI Loaded.");
+// 1. Listen for Track Changes (Metadata)
+playerManager.addEventListener(
+    cast.framework.events.EventType.MEDIA_STATUS, (event) => {
+        const mediaInfo = playerManager.getMediaInformation();
         
-        function updatePlayerUI(title, artist, coverUrl) {
-            document.getElementById('ui-title').innerText = title;
-            document.getElementById('ui-artist').innerText = artist;
-            document.getElementById('ui-album-art').src = coverUrl;
+        if (mediaInfo && mediaInfo.metadata) {
+            // Update Title and Artist
+            document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
+            document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
+            
+            // Update Album Art
+            if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
+                document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+            }
         }
+    }
+);
+
+// 2. Listen for Playback Progress (Time updates)
+playerManager.addEventListener(
+    cast.framework.events.EventType.TIME_UPDATE, (event) => {
+        const currentTime = event.currentMediaTime;
+        const duration = playerManager.getDurationSec();
+        
+        if (duration > 0) {
+            // Calculate progress bar width percentage
+            const progressPercent = (currentTime / duration) * 100;
+            document.getElementById('ui-progress').style.width = progressPercent + '%';
+            
+            // Update time text
+            document.getElementById('ui-time-current').innerText = formatTime(currentTime);
+            document.getElementById('ui-time-total').innerText = formatTime(duration);
+        }
+    }
+);
+
+// Helper function to convert seconds to M:SS format
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60);
+    return min + ":" + (sec < 10 ? "0" + sec : sec);
+}
+
+// 3. Start the Receiver App
+context.start();
     </script>
 </body>
 </html>
