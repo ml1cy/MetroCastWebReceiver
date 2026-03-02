@@ -6,8 +6,214 @@
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <title>Metrolist Cast Receiver</title>
     
-    <!-- Link to external CSS -->
-    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        :root {
+            /* Matched perfectly to your screenshot's color palette */
+            --md-sys-color-background: #1d1c21; 
+            --md-sys-color-on-background: #ffffff;
+            --md-sys-color-primary: #cba6f7; /* Lavender/Purple accent */
+            --md-sys-color-surface-variant: #454549; /* Progress bar track */
+            --md-sys-color-text-muted: #9ca3af;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--md-sys-color-background);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--md-sys-color-on-background);
+        }
+
+        /* Hide default Cast & Smart Display UI elements */
+        cast-media-player, 
+        touch-controls,
+        goog-audio-player-compatibility {
+            display: none !important;
+            position: absolute !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            width: 0 !important;
+            height: 0 !important;
+            z-index: -1 !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Ensure custom UI is always on top */
+        .custom-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2147483647 !important; 
+            background-color: var(--md-sys-color-background);
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Center the overall UI on the screen */
+            padding: 0 clamp(5%, 5vw, 10%); /* Symmetrical padding */
+            box-sizing: border-box;
+        }
+
+        .player-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 100%; /* Span the full width of the display so progress can stretch */
+            align-items: center; 
+            gap: clamp(24px, 4vh, 40px); /* Gap between art/info, progress, and controls */
+        }
+
+        /* NEW: Groups album art and text to share the same width boundary */
+        .art-and-info {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: clamp(280px, 50vh, 480px); /* Ties the text perfectly to the art's edge */
+            align-self: flex-start; /* Left-align the art and info with the screen */
+            gap: clamp(16px, 2vh, 24px);
+        }
+
+        .album-art-container {
+            flex-shrink: 0;
+            width: 100%;
+            display: flex;
+            justify-content: flex-start; /* Ensure left alignment */
+        }
+
+        .album-art {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            height: auto;
+            border-radius: clamp(12px, 2vh, 20px);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+            object-fit: cover;
+            background-color: #313244; /* Subtle fallback for loading state */
+        }
+
+        .track-info {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            justify-content: flex-start;
+            align-items: flex-start; /* Left-align the text */
+            text-align: left;
+        }
+
+        .track-title {
+            font-size: clamp(2rem, 5vh, 3.5rem);
+            font-weight: 700;
+            margin: 0 0 clamp(4px, 1vh, 8px) 0;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .track-artist {
+            font-size: clamp(1.2rem, 3vh, 1.8rem);
+            font-weight: 600;
+            color: var(--md-sys-color-primary);
+            margin: 0; /* Let the player-container's gap handle bottom spacing */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+
+        .progress-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center; 
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: clamp(4px, 0.8vh, 6px);
+            background-color: var(--md-sys-color-surface-variant);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            width: 0%; 
+            height: 100%;
+            background-color: var(--md-sys-color-on-background);
+            border-radius: 4px;
+            transition: width 0.5s linear;
+        }
+
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: clamp(0.85rem, 1.8vh, 1rem);
+            font-weight: 500;
+            color: var(--md-sys-color-text-muted);
+        }
+
+        /* Playback Controls */
+        .controls-row {
+            display: flex;
+            justify-content: center; /* Center the buttons with the screen */
+            align-items: center;
+            gap: clamp(24px, 5vw, 48px);
+            width: 100%;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: clamp(48px, 8vh, 64px);
+            height: clamp(48px, 8vh, 64px);
+            border-radius: 50%;
+            transition: color 0.2s ease, transform 0.1s ease;
+            outline: none;
+        }
+
+        .control-btn:active {
+            color: var(--md-sys-color-on-background);
+            transform: scale(0.92);
+        }
+
+        .control-btn svg {
+            width: clamp(28px, 5vh, 36px);
+            height: clamp(28px, 5vh, 36px);
+            fill: currentColor;
+        }
+
+        .play-pause-btn {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-background);
+            width: clamp(64px, 11vh, 88px);
+            height: clamp(64px, 11vh, 88px);
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .play-pause-btn:active {
+            background-color: #e6d4ff;
+            color: var(--md-sys-color-background);
+            transform: scale(0.92);
+        }
+
+        .play-pause-btn svg {
+            width: clamp(32px, 5.5vh, 44px);
+            height: clamp(32px, 5.5vh, 44px);
+            fill: currentColor;
+        }
+
+    </style>
 </head>
 <body>
 
@@ -15,42 +221,167 @@
     
     <div class="custom-overlay">
         <div class="player-container">
-            <div class="album-art-container">
-                <img class="album-art" id="ui-album-art" src="/images/placehold.svg" alt="Album Art">
-            </div>
             
-            <div class="track-info">
-                <h1 class="track-title" id="ui-title">Ready to Cast</h1>
-                <h2 class="track-artist" id="ui-artist">Metrolist</h2>
+            <!-- NEW WRAPPER: Keeps Art and Info grouped for left-alignment -->
+            <div class="art-and-info">
+                <!-- 1. Album Art -->
+                <div class="album-art-container">
+                    <img class="album-art" id="ui-album-art" src="/images/placehold.svg" alt="Album Art">
+                </div>
                 
-                <div class="progress-container">
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill" id="ui-progress"></div>
-                    </div>
-                    <div class="time-info">
-                        <span id="ui-time-current">0:00</span>
-                        <span id="ui-time-total">0:00</span>
-                    </div>
+                <!-- 2. Track Info (Left Aligned relative to the art) -->
+                <div class="track-info">
+                    <h1 class="track-title" id="ui-title">Ready to Cast</h1>
+                    <h2 class="track-artist" id="ui-artist">Metrolist</h2>
                 </div>
-
-                <div class="controls-row">
-                    <button id="ui-btn-prev" class="control-btn" aria-label="Previous">
-                        <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-                    </button>
-                    <button id="ui-btn-play-pause" class="control-btn play-pause-btn" aria-label="Play or Pause">
-                        <svg id="ui-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        <svg id="ui-icon-pause" viewBox="0 0 24 24" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                    </button>
-                    <button id="ui-btn-next" class="control-btn" aria-label="Next">
-                        <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                    </button>
-                </div>
-
             </div>
+                
+            <!-- 3. Progress Container (Centered underneath, spans wider) -->
+            <div class="progress-container">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="ui-progress"></div>
+                </div>
+                <div class="time-info">
+                    <span id="ui-time-current">0:00</span>
+                    <span id="ui-time-total">0:00</span>
+                </div>
+            </div>
+
+            <!-- 4. Controls Row (Centered with the screen) -->
+            <div class="controls-row">
+                <button id="ui-btn-prev" class="control-btn" aria-label="Previous">
+                    <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                </button>
+                <button id="ui-btn-play-pause" class="control-btn play-pause-btn" aria-label="Play or Pause">
+                    <svg id="ui-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="ui-icon-pause" viewBox="0 0 24 24" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <button id="ui-btn-next" class="control-btn" aria-label="Next">
+                    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                </button>
+            </div>
+
         </div>
     </div>
 
-    <!-- Link to external JS -->
-    <script src="/js/script.js"></script>
+    <script>
+        if (typeof cast === 'undefined') {
+            console.error("Google Cast SDK failed to load. Ensure you are on HTTPS and scripts aren't blocked.");
+            document.getElementById('ui-title').innerText = "Cast SDK Error";
+            document.getElementById('ui-artist').innerText = "Failed to load framework.";
+        } else {
+            console.log("Metrolist Receiver: Initializing Cast Context...");
+            const context = cast.framework.CastReceiverContext.getInstance();
+            const playerManager = context.getPlayerManager();
+
+            // Track and State changes
+            playerManager.addEventListener(
+                cast.framework.events.EventType.MEDIA_STATUS, (event) => {
+                    console.log("Metrolist Receiver: Received MEDIA_STATUS event");
+                    
+                    // Update metadata
+                    const mediaInfo = playerManager.getMediaInformation();
+                    if (mediaInfo && mediaInfo.metadata) {
+                        document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
+                        document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
+                        
+                        if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
+                            document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+                        }
+                    }
+
+                    // Update play/pause icon
+                    const state = playerManager.getPlayerState();
+                    const playIcon = document.getElementById('ui-icon-play');
+                    const pauseIcon = document.getElementById('ui-icon-pause');
+                    
+                    if (state === cast.framework.messages.PlayerState.PLAYING || 
+                        state === cast.framework.messages.PlayerState.BUFFERING) {
+                        playIcon.style.display = 'none';
+                        pauseIcon.style.display = 'block';
+                    } else {
+                        playIcon.style.display = 'block';
+                        pauseIcon.style.display = 'none';
+                    }
+                }
+            );
+
+            // Playback progress
+            playerManager.addEventListener(
+                cast.framework.events.EventType.TIME_UPDATE, (event) => {
+                    const currentTime = event.currentMediaTime;
+                    const duration = playerManager.getDurationSec();
+                    
+                    if (duration > 0) {
+                        const progressPercent = (currentTime / duration) * 100;
+                        document.getElementById('ui-progress').style.width = progressPercent + '%';
+                        
+                        document.getElementById('ui-time-current').innerText = formatTime(currentTime);
+                        document.getElementById('ui-time-total').innerText = formatTime(duration);
+                    }
+                }
+            );
+
+            // Controls
+            document.getElementById('ui-btn-play-pause').addEventListener('click', () => {
+                const state = playerManager.getPlayerState();
+                console.log("Metrolist Receiver: Play/Pause clicked. Current state:", state);
+                if (state === cast.framework.messages.PlayerState.PLAYING || 
+                    state === cast.framework.messages.PlayerState.BUFFERING) {
+                    playerManager.pause();
+                } else {
+                    playerManager.play();
+                }
+            });
+
+            document.getElementById('ui-btn-prev').addEventListener('click', () => {
+                console.log("Metrolist Receiver: Previous clicked");
+                const request = new cast.framework.messages.QueueUpdateRequestData();
+                request.jump = -1;
+                playerManager.sendLocalMediaRequest(request);
+            });
+
+            document.getElementById('ui-btn-next').addEventListener('click', () => {
+                console.log("Metrolist Receiver: Next clicked");
+                const request = new cast.framework.messages.QueueUpdateRequestData();
+                request.jump = 1;
+                playerManager.sendLocalMediaRequest(request);
+            });
+
+            function formatTime(seconds) {
+                if (!seconds || isNaN(seconds)) return "0:00";
+                const min = Math.floor(seconds / 60);
+                const sec = Math.floor(seconds % 60);
+                return min + ":" + (sec < 10 ? "0" + sec : sec);
+            }
+
+            // Receiver context setup
+            const options = new cast.framework.CastReceiverOptions();
+            
+            // Disable idle timeout
+            options.disableIdleTimeout = true;
+            
+            // Disable Smart Display touch UI
+            const uiConfig = new cast.framework.ui.UiConfig();
+            uiConfig.touchScreenOptimizedApp = false;
+            options.uiConfig = uiConfig;
+            
+            // Enable debug logging
+            options.customNamespaces = Object.assign({});
+            cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+            
+            console.log("Metrolist Receiver: Starting context...");
+            context.start(options);
+
+            // Clear default Smart Display slots
+            try {
+                const controls = cast.framework.ui.Controls.getInstance();
+                controls.clearDefaultSlotAssignments();
+                console.log("Metrolist Receiver: Cleared default Smart Display controls.");
+            } catch (e) {
+                console.log("Metrolist Receiver: UI Controls not applicable.");
+            }
+        }
+    </script>
 </body>
 </html>
