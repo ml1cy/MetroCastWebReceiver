@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <title>Metrolist Cast Receiver</title>
     
     <style>
@@ -25,6 +25,18 @@
             justify-content: center;
             height: 100vh;
             overflow: hidden;
+        }
+
+        cast-media-player {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            position: absolute !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            z-index: -999 !important;
+            width: 0 !important;
+            height: 0 !important;
         }
 
         .player-container {
@@ -58,12 +70,20 @@
             font-weight: bold;
             margin: 0 0 16px 0;
             line-height: 1.1;
+            /* Prevent massive titles from breaking the layout */
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .track-artist {
             font-size: 2.5rem;
             color: var(--md-sys-color-primary);
             margin: 0 0 48px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .progress-container {
@@ -82,11 +102,12 @@
         }
 
         .progress-bar-fill {
-            width: 35%; 
+            width: 0%; /* Start at 0% */
             height: 100%;
             background-color: var(--md-sys-color-primary);
             border-radius: 6px;
-            transition: width 1s linear;
+            /* Smooth progress bar movement */
+            transition: width 0.5s linear;
         }
 
         .time-info {
@@ -100,6 +121,7 @@
 </head>
 <body>
 
+    <cast-media-player></cast-media-player>
     <audio id="cast-audio-element"></audio>
 
     <div class="player-container">
@@ -108,8 +130,8 @@
         </div>
         
         <div class="track-info">
-            <h1 class="track-title" id="ui-title">Title</h1>
-            <h2 class="track-artist" id="ui-artist">Artist</h2>
+            <h1 class="track-title" id="ui-title">Ready to Cast</h1>
+            <h2 class="track-artist" id="ui-artist">Metrolist</h2>
             
             <div class="progress-container">
                 <div class="progress-bar-bg">
@@ -124,59 +146,61 @@
     </div>
 
     <script>
-const context = cast.framework.CastReceiverContext.getInstance();
-const playerManager = context.getPlayerManager();
+        // Check if the Cast SDK loaded successfully
+        if (typeof cast === 'undefined') {
+            console.error("Google Cast SDK failed to load. Ensure you are on HTTPS and scripts aren't blocked.");
+            document.getElementById('ui-title').innerText = "Cast SDK Error";
+            document.getElementById('ui-artist').innerText = "Failed to load framework.";
+        } else {
+            const context = cast.framework.CastReceiverContext.getInstance();
+            const playerManager = context.getPlayerManager();
 
-playerManager.setMediaElement(document.getElementById('cast-audio-element'));
+            // Route audio
+            playerManager.setMediaElement(document.getElementById('cast-audio-element'));
 
-context.start();
+            // Listen for Track Changes
+            playerManager.addEventListener(
+                cast.framework.events.EventType.MEDIA_STATUS, (event) => {
+                    const mediaInfo = playerManager.getMediaInformation();
+                    
+                    if (mediaInfo && mediaInfo.metadata) {
+                        document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
+                        document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
+                        
+                        if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
+                            document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+                        }
+                    }
+                }
+            );
 
-// Listen for Track Changes
-playerManager.addEventListener(
-    cast.framework.events.EventType.MEDIA_STATUS, (event) => {
-        const mediaInfo = playerManager.getMediaInformation();
-        
-        if (mediaInfo && mediaInfo.metadata) {
-            // Update Title and Artist
-            document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
-            document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
-            
-            // Update Album Art
-            if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
-                document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+            // Listen for Playback Progress
+            playerManager.addEventListener(
+                cast.framework.events.EventType.TIME_UPDATE, (event) => {
+                    const currentTime = event.currentMediaTime;
+                    const duration = playerManager.getDurationSec();
+                    
+                    if (duration > 0) {
+                        const progressPercent = (currentTime / duration) * 100;
+                        document.getElementById('ui-progress').style.width = progressPercent + '%';
+                        
+                        document.getElementById('ui-time-current').innerText = formatTime(currentTime);
+                        document.getElementById('ui-time-total').innerText = formatTime(duration);
+                    }
+                }
+            );
+
+            // Helper function to format seconds to M:SS
+            function formatTime(seconds) {
+                if (!seconds || isNaN(seconds)) return "0:00";
+                const min = Math.floor(seconds / 60);
+                const sec = Math.floor(seconds % 60);
+                return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
+
+            // START THE CONTEXT ONCE AT THE VERY END
+            context.start();
         }
-    }
-);
-
-// Listen for Playback Progress
-playerManager.addEventListener(
-    cast.framework.events.EventType.TIME_UPDATE, (event) => {
-        const currentTime = event.currentMediaTime;
-        const duration = playerManager.getDurationSec();
-        
-        if (duration > 0) {
-            // Calculate progress bar width percentage
-            const progressPercent = (currentTime / duration) * 100;
-            document.getElementById('ui-progress').style.width = progressPercent + '%';
-            
-            // Update time text
-            document.getElementById('ui-time-current').innerText = formatTime(currentTime);
-            document.getElementById('ui-time-total').innerText = formatTime(duration);
-        }
-    }
-);
-
-// Helper function to convert seconds to M:SS format
-function formatTime(seconds) {
-    if (!seconds || isNaN(seconds)) return "0:00";
-    const min = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60);
-    return min + ":" + (sec < 10 ? "0" + sec : sec);
-}
-
-// Start the Receiver App
-context.start();
     </script>
 </body>
 </html>
