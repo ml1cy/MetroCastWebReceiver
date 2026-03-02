@@ -111,16 +111,16 @@
         </div>
         
         <div class="track-info">
-            <h1 class="track-title" id="ui-title">Not Like Us</h1>
-            <h2 class="track-artist" id="ui-artist">Kendrick Lamar</h2>
+            <h1 class="track-title" id="ui-title">Title</h1>
+            <h2 class="track-artist" id="ui-artist">Artist</h2>
             
             <div class="progress-container">
                 <div class="progress-bar-bg">
                     <div class="progress-bar-fill" id="ui-progress"></div>
                 </div>
                 <div class="time-info">
-                    <span id="ui-time-current">0:52</span>
-                    <span id="ui-time-total">4:34</span>
+                    <span id="ui-time-current">0:00</span>
+                    <span id="ui-time-total">0:00</span>
                 </div>
             </div>
         </div>
@@ -130,7 +130,7 @@
 const context = cast.framework.CastReceiverContext.getInstance();
 const playerManager = context.getPlayerManager();
 
-// 1. Listen for Track Changes (Metadata)
+// Listen for Track Changes
 playerManager.addEventListener(
     cast.framework.events.EventType.MEDIA_STATUS, (event) => {
         const mediaInfo = playerManager.getMediaInformation();
@@ -148,7 +148,7 @@ playerManager.addEventListener(
     }
 );
 
-// 2. Listen for Playback Progress (Time updates)
+// Listen for Playback Progress
 playerManager.addEventListener(
     cast.framework.events.EventType.TIME_UPDATE, (event) => {
         const currentTime = event.currentMediaTime;
@@ -174,7 +174,7 @@ function formatTime(seconds) {
     return min + ":" + (sec < 10 ? "0" + sec : sec);
 }
 
-// 3. Start the Receiver App
+// Start the Receiver App
 context.start();
     </script>
 </body>
