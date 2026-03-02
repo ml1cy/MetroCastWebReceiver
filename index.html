@@ -23,6 +23,10 @@
             color: var(--md-sys-color-on-background);
         }
 
+        /* NEST HUB FIX:
+           Google automatically injects massive <touch-controls> elements 
+           on Smart Displays with a z-index of 1,000,000. We explicitly destroy them here. 
+        */
         cast-media-player, 
         touch-controls,
         goog-audio-player-compatibility {
@@ -37,6 +41,9 @@
             pointer-events: none !important; /* Stops it from stealing touch events */
         }
 
+        /* Our custom UI now uses the maximum 32-bit integer for z-index
+           to mathematically guarantee it sits above Google's 1,000,000 z-index.
+        */
         .custom-overlay {
             position: absolute;
             top: 0;
@@ -126,6 +133,58 @@
             opacity: 0.8;
         }
 
+        /* --- NEW PLAYBACK CONTROLS CSS --- */
+        .controls-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            margin-top: 32px;
+            width: 100%;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-on-background);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            outline: none;
+        }
+
+        .control-btn:active {
+            background-color: rgba(255, 255, 255, 0.15);
+            transform: scale(0.95);
+        }
+
+        .control-btn svg {
+            width: 48px;
+            height: 48px;
+            fill: currentColor;
+        }
+
+        .play-pause-btn {
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-background);
+            width: 96px;
+            height: 96px;
+        }
+
+        .play-pause-btn:active {
+            background-color: #EADDFF; /* Lighter primary on press */
+        }
+
+        .play-pause-btn svg {
+            width: 56px;
+            height: 56px;
+        }
+
     </style>
 </head>
 <body>
@@ -151,6 +210,20 @@
                         <span id="ui-time-total">0:00</span>
                     </div>
                 </div>
+
+                <div class="controls-row">
+                    <button id="ui-btn-prev" class="control-btn" aria-label="Previous">
+                        <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                    </button>
+                    <button id="ui-btn-play-pause" class="control-btn play-pause-btn" aria-label="Play or Pause">
+                        <svg id="ui-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <svg id="ui-icon-pause" viewBox="0 0 24 24" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    <button id="ui-btn-next" class="control-btn" aria-label="Next">
+                        <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
@@ -165,7 +238,7 @@
             const context = cast.framework.CastReceiverContext.getInstance();
             const playerManager = context.getPlayerManager();
 
-            // Listen for Track Changes
+            // Listen for Track Changes 
             playerManager.addEventListener(
                 cast.framework.events.EventType.MEDIA_STATUS, (event) => {
                     console.log("Metrolist Receiver: Received MEDIA_STATUS event", event);
@@ -204,6 +277,51 @@
                 }
             );
 
+            // Listen for Play/Pause State
+            playerManager.addEventListener(
+                cast.framework.events.EventType.PLAYER_STATE_CHANGED, (event) => {
+                    console.log("Metrolist Receiver: Player state changed to", event.playerState);
+                    const state = event.playerState;
+                    const playIcon = document.getElementById('ui-icon-play');
+                    const pauseIcon = document.getElementById('ui-icon-pause');
+                    
+                    if (state === cast.framework.messages.PlayerState.PLAYING || 
+                        state === cast.framework.messages.PlayerState.BUFFERING) {
+                        playIcon.style.display = 'none';
+                        pauseIcon.style.display = 'block';
+                    } else {
+                        playIcon.style.display = 'block';
+                        pauseIcon.style.display = 'none';
+                    }
+                }
+            );
+
+            // Handle Play/Pause Button Click
+            document.getElementById('ui-btn-play-pause').addEventListener('click', () => {
+                const state = playerManager.getPlayerState();
+                console.log("Metrolist Receiver: Play/Pause clicked. Current state:", state);
+                if (state === cast.framework.messages.PlayerState.PLAYING || 
+                    state === cast.framework.messages.PlayerState.BUFFERING) {
+                    playerManager.pause();
+                } else {
+                    playerManager.play();
+                }
+            });
+
+            document.getElementById('ui-btn-prev').addEventListener('click', () => {
+                console.log("Metrolist Receiver: Previous clicked");
+                const request = new cast.framework.messages.QueueUpdateRequestData();
+                request.jump = -1;
+                playerManager.sendLocalMediaRequest(request);
+            });
+
+            document.getElementById('ui-btn-next').addEventListener('click', () => {
+                console.log("Metrolist Receiver: Next clicked");
+                const request = new cast.framework.messages.QueueUpdateRequestData();
+                request.jump = 1;
+                playerManager.sendLocalMediaRequest(request);
+            });
+
             function formatTime(seconds) {
                 if (!seconds || isNaN(seconds)) return "0:00";
                 const min = Math.floor(seconds / 60);
@@ -211,25 +329,25 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
-            // Start the receiver context properly
+            // Start the receiver context 
             const options = new cast.framework.CastReceiverOptions();
             
-            // Disable the default timeout so the screen doesn't turn off quickly if paused
+            // Disable the default timeout so the screen doesn't turn off if paused
             options.disableIdleTimeout = true;
             
-            // Tell the framework we will handle our own UI so it doesn't inject its default controls
+            // Tell Google we do NOT want the Smart Display Touch UI
             const uiConfig = new cast.framework.ui.UiConfig();
             uiConfig.touchScreenOptimizedApp = false;
             options.uiConfig = uiConfig;
             
-            // Set logging level so framework internals are visible
+            // Set logging level so we can see framework internals in the console if needed
             options.customNamespaces = Object.assign({});
             cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
             
             console.log("Metrolist Receiver: Starting context...");
             context.start(options);
 
-            // Erase all default Smart Display UI buttons that Google injects
+            // Erase all default Smart Display UI buttons just in case it still tries to load
             try {
                 const controls = cast.framework.ui.Controls.getInstance();
                 controls.clearDefaultSlotAssignments();
