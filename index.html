@@ -27,18 +27,6 @@
             overflow: hidden;
         }
 
-        cast-media-player {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            position: absolute !important;
-            top: -9999px !important;
-            left: -9999px !important;
-            z-index: -999 !important;
-            width: 0 !important;
-            height: 0 !important;
-        }
-
         .player-container {
             display: flex;
             width: 85%;
@@ -121,7 +109,7 @@
 </head>
 <body>
 
-    <cast-media-player></cast-media-player>
+
     <audio id="cast-audio-element"></audio>
 
     <div class="player-container">
@@ -146,7 +134,7 @@
     </div>
 
     <script>
-        // Check if the Cast SDK loaded successfully
+        // Check if the Cast SDK loaded
         if (typeof cast === 'undefined') {
             console.error("Google Cast SDK failed to load. Ensure you are on HTTPS and scripts aren't blocked.");
             document.getElementById('ui-title').innerText = "Cast SDK Error";
@@ -155,7 +143,7 @@
             const context = cast.framework.CastReceiverContext.getInstance();
             const playerManager = context.getPlayerManager();
 
-            // Route audio
+            // Route audio to audio element
             playerManager.setMediaElement(document.getElementById('cast-audio-element'));
 
             // Listen for Track Changes
@@ -198,8 +186,9 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
-            // START THE CONTEXT ONCE AT THE VERY END
-            context.start();
+            // Start the receiver context
+            const options = new cast.framework.CastReceiverOptions();
+            context.start(options);
         }
     </script>
 </body>
