@@ -8,11 +8,10 @@
     
     <style>
         :root {
-            /* Matched perfectly to your screenshot's color palette */
             --md-sys-color-background: #1d1c21; 
             --md-sys-color-on-background: #ffffff;
-            --md-sys-color-primary: #cba6f7; /* Lavender/Purple accent */
-            --md-sys-color-surface-variant: #454549; /* Progress bar track */
+            --md-sys-color-primary: #cba6f7; 
+            --md-sys-color-surface-variant: #454549; 
             --md-sys-color-text-muted: #9ca3af;
         }
 
@@ -40,7 +39,7 @@
             pointer-events: none !important;
         }
 
-        /* Ensure custom UI is always on top */
+        /* Base Full-Screen Overlay */
         .custom-overlay {
             position: absolute;
             top: 0;
@@ -49,30 +48,51 @@
             height: 100vh;
             z-index: 2147483647 !important; 
             background-color: var(--md-sys-color-background);
+        }
+
+        /* The master container for the split view */
+        .main-layout {
             display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
             align-items: center;
-            justify-content: center; /* Center the overall UI on the screen */
-            padding: 0 clamp(5%, 5vw, 10%); /* Symmetrical padding */
+            justify-content: space-between;
+        }
+
+        /* --- LEFT SIDE: PLAYER SECTION --- */
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            width: 100%; 
+            height: 100%;
+            padding: 0 clamp(5%, 5vw, 10%);
             box-sizing: border-box;
+            transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), padding 0.5s ease;
+        }
+
+        /* When lyrics are active, squish the player gracefully to 50% width */
+        .main-layout.has-lyrics .player-section {
+            width: 50%;
+            padding-right: clamp(2%, 3vw, 5%);
         }
 
         .player-container {
             display: flex;
             flex-direction: column;
             width: 100%;
-            max-width: 100%; /* Span the full width of the display so progress can stretch */
+            max-width: 100%; 
             align-items: center; 
-            gap: clamp(24px, 4vh, 40px); /* Gap between art/info, progress, and controls */
+            gap: clamp(24px, 4vh, 40px);
         }
 
-        /* NEW: Groups album art and text to share the same width boundary */
         .art-and-info {
             display: flex;
             flex-direction: column;
             width: 100%;
-            /* Increased max-width so the larger text doesn't wrap awkwardly */
             max-width: clamp(320px, 60vw, 800px); 
-            align-self: flex-start; /* Left-align the art and info with the screen */
+            align-self: flex-start; 
             gap: clamp(12px, 2vh, 24px);
         }
 
@@ -80,18 +100,17 @@
             flex-shrink: 0;
             width: 100%;
             display: flex;
-            justify-content: flex-start; /* Ensure left alignment */
+            justify-content: flex-start;
         }
 
         .album-art {
-            /* Decoupled width from container, made it significantly smaller for 1024x600 displays */
             width: clamp(160px, 35vh, 320px); 
             aspect-ratio: 1 / 1;
             height: auto;
             border-radius: clamp(12px, 2vh, 20px);
             box-shadow: 0 16px 40px rgba(0,0,0,0.4);
             object-fit: cover;
-            background-color: #313244; /* Subtle fallback for loading state */
+            background-color: #313244;
         }
 
         .track-info {
@@ -99,13 +118,12 @@
             flex-direction: column;
             width: 100%;
             justify-content: flex-start;
-            align-items: flex-start; /* Left-align the text */
+            align-items: flex-start;
             text-align: left;
         }
 
         .track-title {
-            /* Increased font size specifically for better readability on Smart Displays */
-            font-size: clamp(2.5rem, 7.5vh, 4.5rem);
+            font-size: clamp(2.5rem, 7.5vh, 4.5rem); 
             font-weight: 700;
             margin: 0 0 clamp(4px, 1vh, 8px) 0;
             line-height: 1.1;
@@ -118,11 +136,10 @@
         }
 
         .track-artist {
-            /* Increased font size for artist text */
-            font-size: clamp(1.5rem, 4vh, 2.5rem);
+            font-size: clamp(1.5rem, 4vh, 2.5rem); 
             font-weight: 600;
             color: var(--md-sys-color-primary);
-            margin: 0; /* Let the player-container's gap handle bottom spacing */
+            margin: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -157,19 +174,37 @@
             display: flex;
             justify-content: space-between;
             width: 100%;
-            /* Increased font size for better readability from a distance */
             font-size: clamp(1.2rem, 2.5vh, 1.5rem);
             font-weight: 500;
             color: var(--md-sys-color-text-muted);
         }
 
-        /* Playback Controls */
+        /* Playback Controls Container */
         .controls-row {
             display: flex;
-            justify-content: center; /* Center the buttons with the screen */
+            justify-content: space-between;
+            align-items: center;
+            margin-top: clamp(16px, 4vh, 32px);
+            width: 100%;
+            padding: 0 clamp(8px, 1vw, 16px); /* Prevents buttons from kissing the screen edge */
+            box-sizing: border-box;
+        }
+
+        /* Invisible spacers to keep the main controls perfectly centered */
+        .control-spacer {
+            flex: 1;
+            display: flex;
+        }
+
+        .control-spacer.right {
+            justify-content: flex-end;
+        }
+
+        .center-controls {
+            display: flex;
+            justify-content: center;
             align-items: center;
             gap: clamp(24px, 5vw, 48px);
-            width: 100%;
         }
 
         .control-btn {
@@ -185,6 +220,14 @@
             border-radius: 50%;
             transition: color 0.2s ease, transform 0.1s ease;
             outline: none;
+            padding: 0;
+            touch-action: manipulation; /* Prevents fast-tap delays on Nest Hub */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* CRITICAL FIX: Stops the SVG inside the button from stealing the click event */
+        .control-btn * {
+            pointer-events: none;
         }
 
         .control-btn:active {
@@ -218,6 +261,82 @@
             fill: currentColor;
         }
 
+        .lyrics-btn {
+            color: var(--md-sys-color-text-muted);
+            z-index: 10;
+        }
+
+        .lyrics-btn.active {
+            color: var(--md-sys-color-primary);
+        }
+
+        /* --- RIGHT SIDE: LYRICS SECTION --- */
+        .lyrics-section {
+            width: 0%; 
+            opacity: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-sizing: border-box;
+            transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease, padding 0.5s ease;
+            overflow: hidden;
+            pointer-events: none; 
+        }
+
+        .main-layout.has-lyrics .lyrics-section {
+            width: 50%;
+            opacity: 1;
+            padding: 0 clamp(5%, 5vw, 10%) 0 0;
+            pointer-events: auto; 
+        }
+
+        .lyrics-container {
+            height: clamp(300px, 70vh, 800px);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+        }
+
+        .lyrics-scroll {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(16px, 3vh, 24px);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform;
+        }
+
+        .lyric-line {
+            font-size: clamp(1.5rem, 4.5vh, 3rem);
+            font-weight: 700;
+            color: var(--md-sys-color-text-muted);
+            margin: 0;
+            opacity: 0.4;
+            transition: opacity 0.3s ease, color 0.3s ease, transform 0.3s ease;
+            transform-origin: left center;
+            line-height: 1.3;
+        }
+
+        .lyric-line.active {
+            color: var(--md-sys-color-on-background);
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .lyric-placeholder {
+            font-size: clamp(1.5rem, 4vh, 2.5rem);
+            font-weight: 600;
+            color: var(--md-sys-color-text-muted);
+            text-align: left;
+            margin-top: 30vh; 
+            opacity: 0.5;
+        }
+
     </style>
 </head>
 <body>
@@ -225,77 +344,113 @@
     <cast-media-player></cast-media-player>
     
     <div class="custom-overlay">
-        <div class="player-container">
+        <!-- Starts OFF (no has-lyrics class) -->
+        <div class="main-layout" id="main-layout">
             
-            <!-- NEW WRAPPER: Keeps Art and Info grouped for left-alignment -->
-            <div class="art-and-info">
-                <!-- 1. Album Art -->
-                <div class="album-art-container">
-                    <img class="album-art" id="ui-album-art" src="/images/placehold.svg" alt="Album Art">
-                </div>
-                
-                <!-- 2. Track Info (Left Aligned relative to the art) -->
-                <div class="track-info">
-                    <h1 class="track-title" id="ui-title">Ready to Cast</h1>
-                    <h2 class="track-artist" id="ui-artist">Metrolist</h2>
-                </div>
-            </div>
-                
-            <!-- 3. Progress Container (Centered underneath, spans wider) -->
-            <div class="progress-container">
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="ui-progress"></div>
-                </div>
-                <div class="time-info">
-                    <span id="ui-time-current">0:00</span>
-                    <span id="ui-time-total">0:00</span>
+            <div class="player-section">
+                <div class="player-container">
+                    <div class="art-and-info">
+                        <div class="album-art-container">
+                            <img class="album-art" id="ui-album-art" src="/images/placehold.svg" alt="Album Art">
+                        </div>
+                        <div class="track-info">
+                            <h1 class="track-title" id="ui-title">Ready to Cast</h1>
+                            <h2 class="track-artist" id="ui-artist">Metrolist</h2>
+                        </div>
+                    </div>
+                        
+                    <div class="progress-container">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="ui-progress"></div>
+                        </div>
+                        <div class="time-info">
+                            <span id="ui-time-current">0:00</span>
+                            <span id="ui-time-total">0:00</span>
+                        </div>
+                    </div>
+
+                    <div class="controls-row">
+                        <!-- Invisible spacer to balance the lyrics button -->
+                        <div class="control-spacer"></div>
+
+                        <!-- Centered media controls -->
+                        <div class="center-controls">
+                            <button id="ui-btn-prev" class="control-btn" aria-label="Previous">
+                                <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                            </button>
+                            <button id="ui-btn-play-pause" class="control-btn play-pause-btn" aria-label="Play or Pause">
+                                <svg id="ui-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                <svg id="ui-icon-pause" viewBox="0 0 24 24" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            </button>
+                            <button id="ui-btn-next" class="control-btn" aria-label="Next">
+                                <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Right aligned lyrics button -->
+                        <div class="control-spacer right">
+                            <button id="ui-btn-lyrics" class="control-btn lyrics-btn" aria-label="Toggle Lyrics">
+                                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-6 14H6v-2h8v2zm4-4H6v-2h12v2zm0-4H6V6h12v2z"/></svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 4. Controls Row (Centered with the screen) -->
-            <div class="controls-row">
-                <button id="ui-btn-prev" class="control-btn" aria-label="Previous">
-                    <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-                </button>
-                <button id="ui-btn-play-pause" class="control-btn play-pause-btn" aria-label="Play or Pause">
-                    <svg id="ui-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    <svg id="ui-icon-pause" viewBox="0 0 24 24" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                </button>
-                <button id="ui-btn-next" class="control-btn" aria-label="Next">
-                    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                </button>
+            <div class="lyrics-section">
+                <div class="lyrics-container" id="lyrics-container">
+                    <div class="lyrics-scroll" id="lyrics-scroll">
+                        <div class="lyric-placeholder">Waiting for track data...</div>
+                    </div>
+                </div>
             </div>
 
         </div>
     </div>
 
     <script>
+        // Track states safely
+        let currentLyrics = [];
+        let activeLyricIndex = -1;
+        let isLyricsVisible = false; // Set strictly OFF by default
+        let currentMediaId = null; 
+        let currentMediaTime = 0; // Safely cached time
+
         if (typeof cast === 'undefined') {
-            console.error("Google Cast SDK failed to load. Ensure you are on HTTPS and scripts aren't blocked.");
-            document.getElementById('ui-title').innerText = "Cast SDK Error";
-            document.getElementById('ui-artist').innerText = "Failed to load framework.";
+            console.error("Google Cast SDK failed to load.");
         } else {
-            console.log("Metrolist Receiver: Initializing Cast Context...");
             const context = cast.framework.CastReceiverContext.getInstance();
             const playerManager = context.getPlayerManager();
 
-            // Track and State changes
             playerManager.addEventListener(
                 cast.framework.events.EventType.MEDIA_STATUS, (event) => {
-                    console.log("Metrolist Receiver: Received MEDIA_STATUS event");
-                    
-                    // Update metadata
                     const mediaInfo = playerManager.getMediaInformation();
+                    
                     if (mediaInfo && mediaInfo.metadata) {
-                        document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
-                        document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
+                        const newMediaId = mediaInfo.contentId || mediaInfo.metadata.title;
                         
-                        if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
-                            document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+                        if (newMediaId && newMediaId !== currentMediaId) {
+                            currentMediaId = newMediaId;
+                            
+                            document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
+                            document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
+                            
+                            if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
+                                document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
+                            }
+
+                            const customData = mediaInfo.customData || {};
+                            
+                            // If Android sends an empty string or undefined, use the mock.
+                            // If they send legitimate lyrics, it will parse them.
+                            const mockLRC = `[00:01.00] (Music Playing)\n[00:05.00] This is a mock lyric track\n[00:08.50] To demonstrate the smooth scrolling\n[00:12.00] And active line highlighting\n[00:15.00] Once your Android app sends real data\n[00:19.00] It will look just like this!\n[00:23.00] Enjoy the new Metrolist UI.`;
+                            const rawLyrics = customData.lyrics ? customData.lyrics : mockLRC; 
+                            
+                            setupLyrics(rawLyrics);
                         }
                     }
 
-                    // Update play/pause icon
+                    // Update play/pause icon safely on every event
                     const state = playerManager.getPlayerState();
                     const playIcon = document.getElementById('ui-icon-play');
                     const pauseIcon = document.getElementById('ui-icon-pause');
@@ -311,26 +466,29 @@
                 }
             );
 
-            // Playback progress
             playerManager.addEventListener(
                 cast.framework.events.EventType.TIME_UPDATE, (event) => {
-                    const currentTime = event.currentMediaTime;
+                    currentMediaTime = event.currentMediaTime; 
                     const duration = playerManager.getDurationSec();
                     
                     if (duration > 0) {
-                        const progressPercent = (currentTime / duration) * 100;
+                        const progressPercent = (currentMediaTime / duration) * 100;
                         document.getElementById('ui-progress').style.width = progressPercent + '%';
                         
-                        document.getElementById('ui-time-current').innerText = formatTime(currentTime);
+                        document.getElementById('ui-time-current').innerText = formatTime(currentMediaTime);
                         document.getElementById('ui-time-total').innerText = formatTime(duration);
+                    }
+
+                    if (isLyricsVisible) {
+                        syncLyricsToTime(currentMediaTime);
                     }
                 }
             );
 
-            // Controls
-            document.getElementById('ui-btn-play-pause').addEventListener('click', () => {
+            // Button Event Listeners
+            document.getElementById('ui-btn-play-pause').addEventListener('click', (e) => {
+                e.preventDefault();
                 const state = playerManager.getPlayerState();
-                console.log("Metrolist Receiver: Play/Pause clicked. Current state:", state);
                 if (state === cast.framework.messages.PlayerState.PLAYING || 
                     state === cast.framework.messages.PlayerState.BUFFERING) {
                     playerManager.pause();
@@ -339,18 +497,37 @@
                 }
             });
 
-            document.getElementById('ui-btn-prev').addEventListener('click', () => {
-                console.log("Metrolist Receiver: Previous clicked");
+            document.getElementById('ui-btn-prev').addEventListener('click', (e) => {
+                e.preventDefault();
                 const request = new cast.framework.messages.QueueUpdateRequestData();
                 request.jump = -1;
                 playerManager.sendLocalMediaRequest(request);
             });
 
-            document.getElementById('ui-btn-next').addEventListener('click', () => {
-                console.log("Metrolist Receiver: Next clicked");
+            document.getElementById('ui-btn-next').addEventListener('click', (e) => {
+                e.preventDefault();
                 const request = new cast.framework.messages.QueueUpdateRequestData();
                 request.jump = 1;
                 playerManager.sendLocalMediaRequest(request);
+            });
+
+            // Lyrics Toggle Button
+            document.getElementById('ui-btn-lyrics').addEventListener('click', (e) => {
+                e.preventDefault(); // Prevents double-firing on touch screens
+                isLyricsVisible = !isLyricsVisible;
+                
+                const mainLayout = document.getElementById('main-layout');
+                const lyricsBtn = document.getElementById('ui-btn-lyrics');
+                
+                if (isLyricsVisible) {
+                    mainLayout.classList.add('has-lyrics');
+                    lyricsBtn.classList.add('active');
+                    // Immediately sync scrolling when opened
+                    syncLyricsToTime(currentMediaTime);
+                } else {
+                    mainLayout.classList.remove('has-lyrics');
+                    lyricsBtn.classList.remove('active');
+                }
             });
 
             function formatTime(seconds) {
@@ -360,32 +537,118 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
-            // Receiver context setup
+            function setupLyrics(rawLyrics) {
+                currentLyrics = [];
+                activeLyricIndex = -1;
+                const lyricsScroll = document.getElementById('lyrics-scroll');
+
+                if (rawLyrics) {
+                    if (Array.isArray(rawLyrics)) {
+                        currentLyrics = rawLyrics;
+                    } else if (typeof rawLyrics === 'string') {
+                        const lines = rawLyrics.split('\n');
+                        const timeReg = /\[(\d{2}):(\d{2}(\.\d{1,3})?)\]/;
+                        
+                        lines.forEach(line => {
+                            const match = timeReg.exec(line);
+                            if (match) {
+                                const min = parseInt(match[1], 10);
+                                const sec = parseFloat(match[2]);
+                                const text = line.replace(timeReg, '').trim();
+                                if (text) {
+                                    currentLyrics.push({ time: min * 60 + sec, text: text });
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // Inject lyrics into the DOM regardless of visibility state
+                lyricsScroll.innerHTML = '';
+                
+                if (currentLyrics.length > 0) {
+                    currentLyrics.forEach((lyric, index) => {
+                        const el = document.createElement('div');
+                        el.className = 'lyric-line';
+                        el.id = 'lyric-' + index;
+                        el.innerText = lyric.text;
+                        lyricsScroll.appendChild(el);
+                    });
+                } else {
+                    // Clean fallback if no lyrics parsed
+                    lyricsScroll.innerHTML = '<div class="lyric-placeholder">No lyrics available for this track.</div>';
+                }
+                
+                lyricsScroll.style.transform = 'translateY(0px)';
+
+                // Sync button UI to current memory state
+                const mainLayout = document.getElementById('main-layout');
+                const lyricsBtn = document.getElementById('ui-btn-lyrics');
+                
+                if (isLyricsVisible) {
+                    mainLayout.classList.add('has-lyrics');
+                    lyricsBtn.classList.add('active');
+                } else {
+                    mainLayout.classList.remove('has-lyrics');
+                    lyricsBtn.classList.remove('active');
+                }
+            }
+
+            function syncLyricsToTime(currentTime) {
+                if (currentLyrics.length === 0) return;
+
+                let newIndex = -1;
+                for (let i = 0; i < currentLyrics.length; i++) {
+                    if (currentTime >= currentLyrics[i].time) {
+                        newIndex = i;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (newIndex !== activeLyricIndex) {
+                    if (activeLyricIndex !== -1) {
+                        const oldEl = document.getElementById('lyric-' + activeLyricIndex);
+                        if (oldEl) oldEl.classList.remove('active');
+                    }
+                    
+                    activeLyricIndex = newIndex;
+                    const lyricsScroll = document.getElementById('lyrics-scroll');
+
+                    if (activeLyricIndex !== -1) {
+                        const newEl = document.getElementById('lyric-' + activeLyricIndex);
+                        if (newEl) {
+                            newEl.classList.add('active');
+                            const container = document.getElementById('lyrics-container');
+                            
+                            // Safe fallback in case container height reads as 0 during CSS transitions
+                            const safeContainerHeight = container.clientHeight || 400; 
+                            
+                            const scrollOffset = newEl.offsetTop - (safeContainerHeight / 2) + (newEl.clientHeight / 2);
+                            lyricsScroll.style.transform = `translateY(-${scrollOffset}px)`;
+                        }
+                    } else {
+                        lyricsScroll.style.transform = 'translateY(0px)';
+                    }
+                }
+            }
+
             const options = new cast.framework.CastReceiverOptions();
-            
-            // Disable idle timeout
             options.disableIdleTimeout = true;
             
-            // Disable Smart Display touch UI
             const uiConfig = new cast.framework.ui.UiConfig();
             uiConfig.touchScreenOptimizedApp = false;
             options.uiConfig = uiConfig;
             
-            // Enable debug logging
             options.customNamespaces = Object.assign({});
             cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
             
-            console.log("Metrolist Receiver: Starting context...");
             context.start(options);
 
-            // Clear default Smart Display slots
             try {
                 const controls = cast.framework.ui.Controls.getInstance();
                 controls.clearDefaultSlotAssignments();
-                console.log("Metrolist Receiver: Cleared default Smart Display controls.");
-            } catch (e) {
-                console.log("Metrolist Receiver: UI Controls not applicable.");
-            }
+            } catch (e) {}
         }
     </script>
 </body>
