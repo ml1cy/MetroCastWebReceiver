@@ -70,9 +70,10 @@
             display: flex;
             flex-direction: column;
             width: 100%;
-            max-width: clamp(280px, 50vh, 480px); /* Ties the text perfectly to the art's edge */
+            /* Increased max-width so the larger text doesn't wrap awkwardly */
+            max-width: clamp(320px, 60vw, 800px); 
             align-self: flex-start; /* Left-align the art and info with the screen */
-            gap: clamp(16px, 2vh, 24px);
+            gap: clamp(12px, 2vh, 24px);
         }
 
         .album-art-container {
@@ -83,7 +84,8 @@
         }
 
         .album-art {
-            width: 100%;
+            /* Decoupled width from container, made it significantly smaller for 1024x600 displays */
+            width: clamp(160px, 35vh, 320px); 
             aspect-ratio: 1 / 1;
             height: auto;
             border-radius: clamp(12px, 2vh, 20px);
@@ -102,7 +104,8 @@
         }
 
         .track-title {
-            font-size: clamp(2rem, 5vh, 3.5rem);
+            /* Increased font size specifically for better readability on Smart Displays */
+            font-size: clamp(2.5rem, 7.5vh, 4.5rem);
             font-weight: 700;
             margin: 0 0 clamp(4px, 1vh, 8px) 0;
             line-height: 1.1;
@@ -115,7 +118,8 @@
         }
 
         .track-artist {
-            font-size: clamp(1.2rem, 3vh, 1.8rem);
+            /* Increased font size for artist text */
+            font-size: clamp(1.5rem, 4vh, 2.5rem);
             font-weight: 600;
             color: var(--md-sys-color-primary);
             margin: 0; /* Let the player-container's gap handle bottom spacing */
