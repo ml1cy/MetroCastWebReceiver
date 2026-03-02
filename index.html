@@ -96,18 +96,15 @@
             opacity: 0.8;
         }
 
-        cast-media-player {
-            display: none; 
-        }
     </style>
 </head>
 <body>
 
-    <cast-media-player></cast-media-player>
+    <audio id="cast-audio-element"></audio>
 
     <div class="player-container">
         <div class="album-art-container">
-            <img class="album-art" id="ui-album-art" src="https://upload.wikimedia.org/wikipedia/en/thumb/6/61/Kendrick_Lamar_-_Not_Like_Us.png/250px-Kendrick_Lamar_-_Not_Like_Us.png" alt="Album Art">
+            <img class="album-art" id="ui-album-art" src="/images/placehold.svg" alt="Album Art">
         </div>
         
         <div class="track-info">
@@ -129,6 +126,10 @@
     <script>
 const context = cast.framework.CastReceiverContext.getInstance();
 const playerManager = context.getPlayerManager();
+
+playerManager.setMediaElement(document.getElementById('cast-audio-element'));
+
+context.start();
 
 // Listen for Track Changes
 playerManager.addEventListener(
