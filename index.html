@@ -18,33 +18,32 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #000; /* Fallback for the absolute base layer */
+            background-color: #000;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--md-sys-color-on-background);
         }
 
-        /* Let Google's player exist so the framework doesn't panic, 
-           but put it on the bottom layer.
-        */
-        cast-media-player {
+        cast-media-player, 
+        touch-controls,
+        goog-audio-player-compatibility {
+            display: none !important;
             position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 1 !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            width: 0 !important;
+            height: 0 !important;
+            z-index: -1 !important;
+            opacity: 0 !important;
+            pointer-events: none !important; /* Stops it from stealing touch events */
         }
 
-        /* Our custom UI sits completely ON TOP of the default player,
-           blocking it from view with a solid background.
-        */
         .custom-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            z-index: 9999;
+            z-index: 2147483647 !important; 
             background-color: var(--md-sys-color-background);
             display: flex;
             align-items: center;
@@ -162,21 +161,29 @@
             document.getElementById('ui-title').innerText = "Cast SDK Error";
             document.getElementById('ui-artist').innerText = "Failed to load framework.";
         } else {
+            console.log("Metrolist Receiver: Initializing Cast Context...");
             const context = cast.framework.CastReceiverContext.getInstance();
             const playerManager = context.getPlayerManager();
 
             // Listen for Track Changes
             playerManager.addEventListener(
                 cast.framework.events.EventType.MEDIA_STATUS, (event) => {
+                    console.log("Metrolist Receiver: Received MEDIA_STATUS event", event);
+                    
                     const mediaInfo = playerManager.getMediaInformation();
                     
                     if (mediaInfo && mediaInfo.metadata) {
+                        console.log("Metrolist Receiver: Track Metadata extracted:", mediaInfo.metadata);
+                        
                         document.getElementById('ui-title').innerText = mediaInfo.metadata.title || 'Unknown Title';
                         document.getElementById('ui-artist').innerText = mediaInfo.metadata.artist || 'Unknown Artist';
                         
                         if (mediaInfo.metadata.images && mediaInfo.metadata.images.length > 0) {
+                            console.log("Metrolist Receiver: Loading Album Art URL:", mediaInfo.metadata.images[0].url);
                             document.getElementById('ui-album-art').src = mediaInfo.metadata.images[0].url;
                         }
+                    } else {
+                        console.warn("Metrolist Receiver: No metadata found in MEDIA_STATUS event.");
                     }
                 }
             );
@@ -204,9 +211,32 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
-            // Start the receiver context
+            // Start the receiver context properly
             const options = new cast.framework.CastReceiverOptions();
+            
+            // Disable the default timeout so the screen doesn't turn off quickly if paused
+            options.disableIdleTimeout = true;
+            
+            // Tell the framework we will handle our own UI so it doesn't inject its default controls
+            const uiConfig = new cast.framework.ui.UiConfig();
+            uiConfig.touchScreenOptimizedApp = false;
+            options.uiConfig = uiConfig;
+            
+            // Set logging level so framework internals are visible
+            options.customNamespaces = Object.assign({});
+            cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+            
+            console.log("Metrolist Receiver: Starting context...");
             context.start(options);
+
+            // Erase all default Smart Display UI buttons that Google injects
+            try {
+                const controls = cast.framework.ui.Controls.getInstance();
+                controls.clearDefaultSlotAssignments();
+                console.log("Metrolist Receiver: Cleared default Smart Display controls.");
+            } catch (e) {
+                console.log("Metrolist Receiver: UI Controls not applicable.");
+            }
         }
     </script>
 </body>
