@@ -349,6 +349,26 @@
             color: var(--md-sys-color-primary);
         }
 
+        /* --- WORD-BY-WORD SYNC STYLING --- */
+        .lyric-word {
+            color: inherit; 
+            transition: color 0.15s ease;
+        }
+
+        /* Dim words in the active line until they are reached */
+        .lyric-line.active.has-words .lyric-word {
+            color: rgba(255, 255, 255, 0.35); 
+        }
+
+        .lyric-line.active.has-words .lyric-word.passed {
+            color: var(--md-sys-color-on-background);
+        }
+
+        /* Background vocals use primary color for highlight */
+        .lyric-line.bg-vocal.active.has-words .lyric-word.passed {
+            color: var(--md-sys-color-primary); 
+        }
+
         .lyric-placeholder {
             font-size: clamp(1.5rem, 4vh, 2.5rem);
             font-weight: 600;
@@ -365,8 +385,8 @@
     <cast-media-player></cast-media-player>
     
     <div class="custom-overlay">
-        <!-- Bumped to v1.2.5 to focus on highlighting logic -->
-        <div class="version-tag">v1.2.5</div>
+        <!-- Bumped to v1.2.6 to verify word-by-word parser updates -->
+        <div class="version-tag">v1.2.6</div>
 
         <div class="main-layout" id="main-layout">
             
@@ -459,8 +479,13 @@
                             }
 
                             const customData = mediaInfo.customData || {};
-                            // Mocking the {bg} sequence correctly to test line-level highlighting
-                            const mockLRC = `[00:01.00] {agent:v1} Music Playing\n[00:05.00] This is a line before background vocals\n[00:08.50] {bg} (Background Vocal Highlight)\n[00:12.00] {agent:v1} Line after background vocal\n[00:16.00] {bg} (Another backing vocal line)\n[00:20.00] Enjoy the updated Metrolist UI.`;
+                            
+                            // Mocking the EXACT format provided to test real-time highlighting
+                            const mockLRC = `[00:01.00] {agent:v1}Uh, I see dead people, I need dead people
+<Uh,:1.000:1.300|I:2.000:2.300|see:2.300:2.600|dead:2.600:3.100|people,:3.100:4.100|I:4.100:4.400|need:4.400:4.700|dead:4.700:5.200|people:5.200:5.700>
+[00:06.00] {bg}(Background Vocal Highlight)
+<(Background:6.000:7.000|Vocal:7.000:8.000|Highlight):8.000:9.000>
+[00:10.00] Enjoy the updated Metrolist UI.`;
                             
                             const rawLyrics = customData.lyrics ? customData.lyrics : mockLRC; 
                             setupLyrics(rawLyrics);
@@ -581,15 +606,34 @@
                                 return '';
                             }).trim();
 
-                            // Strip out any word-by-word tags for this iteration
-                            text = text.replace(/<[^>]+>/g, '').trim();
-
                             if (text) {
                                 currentLyrics.push({ 
                                     time: lineTime, 
                                     isBg: isBgVocal,
-                                    text: text 
+                                    text: text,
+                                    words: null 
                                 });
+                            }
+                        } else if (line.trim().startsWith('<') && line.trim().endsWith('>')) {
+                            // Identify word-sync blocks and tie them to the previously parsed lyric line
+                            const syncContent = line.trim().slice(1, -1);
+                            const segments = syncContent.split('|');
+                            let words = [];
+                            
+                            segments.forEach(seg => {
+                                // Regex isolates the word, start time, and end time based on the trailing colons
+                                const match = seg.match(/^(.*?):([\d.]+):([\d.]+)$/);
+                                if (match) {
+                                    words.push({
+                                        text: match[1],
+                                        start: parseFloat(match[2]),
+                                        end: parseFloat(match[3])
+                                    });
+                                }
+                            });
+                            
+                            if (words.length > 0 && currentLyrics.length > 0) {
+                                currentLyrics[currentLyrics.length - 1].words = words;
                             }
                         }
                     });
@@ -602,7 +646,22 @@
                         el.className = 'lyric-line';
                         el.id = 'lyric-' + index;
                         if (lyric.isBg) el.classList.add('bg-vocal');
-                        el.innerText = lyric.text;
+                        
+                        if (lyric.words) {
+                            el.classList.add('has-words');
+                            lyric.words.forEach((word, wIndex) => {
+                                const span = document.createElement('span');
+                                span.className = 'lyric-word';
+                                span.id = `lyric-${index}-word-${wIndex}`;
+                                span.innerText = word.text;
+                                el.appendChild(span);
+                                // Inject a space so the words don't cram together
+                                el.appendChild(document.createTextNode(' '));
+                            });
+                        } else {
+                            el.innerText = lyric.text;
+                        }
+                        
                         lyricsScroll.appendChild(el);
                     });
                 } else {
@@ -638,7 +697,14 @@
                     // Remove active class from previous
                     if (activeLyricIndex !== -1) {
                         const oldEl = document.getElementById('lyric-' + activeLyricIndex);
-                        if (oldEl) oldEl.classList.remove('active');
+                        if (oldEl) {
+                            oldEl.classList.remove('active');
+                            // Clean up word highlights when leaving the line
+                            if (currentLyrics[activeLyricIndex].words) {
+                                const wordSpans = oldEl.querySelectorAll('.lyric-word');
+                                wordSpans.forEach(span => span.classList.remove('passed'));
+                            }
+                        }
                     }
                     
                     activeLyricIndex = newIndex;
@@ -662,6 +728,21 @@
                         const lyricsScroll = document.getElementById('lyrics-scroll');
                         lyricsScroll.style.transform = 'translateY(0px)';
                     }
+                }
+
+                // Continuously evaluate word-by-word highlights for the currently active line
+                if (activeLyricIndex !== -1 && currentLyrics[activeLyricIndex].words) {
+                    const activeLyric = currentLyrics[activeLyricIndex];
+                    activeLyric.words.forEach((word, wIndex) => {
+                        const wordEl = document.getElementById(`lyric-${activeLyricIndex}-word-${wIndex}`);
+                        if (wordEl) {
+                            if (currentTime >= word.start) {
+                                wordEl.classList.add('passed');
+                            } else {
+                                wordEl.classList.remove('passed');
+                            }
+                        }
+                    });
                 }
             }
 
