@@ -72,7 +72,6 @@
             transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), padding 0.5s ease;
         }
 
-        /* When lyrics are active, squish the player gracefully to 50% width */
         .main-layout.has-lyrics .player-section {
             width: 50%;
             padding-right: clamp(2%, 3vw, 5%);
@@ -179,7 +178,6 @@
             color: var(--md-sys-color-text-muted);
         }
 
-        /* Playback Controls Container */
         .controls-row {
             display: flex;
             justify-content: space-between;
@@ -309,13 +307,12 @@
             will-change: transform;
         }
 
-        /* Standard Lead Vocal styling */
         .lyric-line {
             font-size: clamp(1.5rem, 4.5vh, 3rem);
             font-weight: 700;
             color: var(--md-sys-color-text-muted);
             margin: 0;
-            opacity: 0.4;
+            opacity: 0.35;
             transition: opacity 0.3s ease, color 0.3s ease, transform 0.3s ease;
             transform-origin: left center;
             line-height: 1.3;
@@ -326,12 +323,11 @@
             transform: scale(1.05);
         }
 
-        /* If no word-sync, light up the whole line normally */
+        /* Highlight whole line if no words sync data */
         .lyric-line.active:not(.has-words) {
             color: var(--md-sys-color-on-background);
         }
 
-        /* Background Vocal styling mapped from {bg} tags */
         .lyric-line.bg-vocal {
             font-size: clamp(1.2rem, 3.5vh, 2.2rem);
             font-style: italic;
@@ -339,36 +335,29 @@
             text-align: right;
             align-self: flex-end;
             max-width: 85%;
-            opacity: 0.3;
-            transform-origin: right center; /* Scaling expands from the right alignment */
-        }
-
-        .lyric-line.bg-vocal.active {
-            opacity: 0.8; /* Keeps bg vocals slightly softer than lead */
-            transform: scale(1.02);
+            transform-origin: right center;
         }
 
         .lyric-line.bg-vocal.active:not(.has-words) {
-            color: var(--md-sys-color-primary); /* Apple Music style accent color */
+            color: var(--md-sys-color-primary);
         }
 
         /* --- WORD-BY-WORD SYNC STYLING --- */
         .lyric-word {
+            color: inherit; /* Inherit color from parent line by default */
             transition: color 0.15s ease;
-            /* Keeps spaces intact without snapping */
         }
 
-        /* Unsung words in the active line remain dimmed */
+        /* Dim words in the active line until they are reached */
         .lyric-line.active.has-words .lyric-word {
-            color: var(--md-sys-color-text-muted); 
+            color: rgba(255, 255, 255, 0.35); 
         }
 
-        /* Sung words light up */
         .lyric-line.active.has-words .lyric-word.passed {
             color: var(--md-sys-color-on-background);
         }
 
-        /* Sung Background Vocals get the accent color */
+        /* Background vocals use primary color for highlight */
         .lyric-line.bg-vocal.active.has-words .lyric-word.passed {
             color: var(--md-sys-color-primary); 
         }
@@ -480,11 +469,10 @@
                             }
 
                             const customData = mediaInfo.customData || {};
-                            // Mock LRC with word-by-word timestamps (<mm:ss.xxx>) and {bg} tag examples
-                            const mockLRC = `[00:01.00] {agent:v1} <00:01.00> Music <00:02.50> Playing\n[00:05.00] This is a normal lyric line\n[00:08.50] {bg} (To demonstrate right-aligned bg vocals)\n[00:12.00] {agent:v1} <00:12.00> Word <00:12.50> by <00:13.00> word <00:13.50> highlighting\n[00:15.00] Once your Android app sends real data\n[00:19.00] {bg} <00:19.00> (It <00:19.50> will <00:20.00> look <00:20.50> just <00:21.00> like <00:21.50> this!)\n[00:23.00] Enjoy the new Metrolist UI.`;
+                            // Mock LRC with robust word-by-word and bg tagging
+                            const mockLRC = `[00:01.00] {agent:v1} <00:01.00> Music <00:01.50> Playing\n[00:05.00] This is a line before background vocals\n[00:08.50] {bg} <00:08.50> (Background <00:09.50> Vocal <00:10.50> Highlight)\n[00:12.00] {agent:v1} <00:12.00> Word <00:12.40> by <00:12.80> word <00:13.20> highlighting <00:13.60> active\n[00:16.00] {bg} (Another backing vocal line)\n[00:20.00] Enjoy the updated Metrolist UI.`;
                             
                             const rawLyrics = customData.lyrics ? customData.lyrics : mockLRC; 
-                            
                             setupLyrics(rawLyrics);
                         }
                     }
@@ -572,89 +560,73 @@
                 return min + ":" + (sec < 10 ? "0" + sec : sec);
             }
 
+            function parseLrcTime(timeStr) {
+                const parts = timeStr.split(':');
+                if (parts.length < 2) return 0;
+                const min = parseInt(parts[0], 10);
+                const sec = parseFloat(parts[1]);
+                return min * 60 + sec;
+            }
+
             function setupLyrics(rawLyrics) {
                 currentLyrics = [];
                 activeLyricIndex = -1;
                 const lyricsScroll = document.getElementById('lyrics-scroll');
 
-                if (rawLyrics) {
-                    if (Array.isArray(rawLyrics)) {
-                        currentLyrics = rawLyrics;
-                    } else if (typeof rawLyrics === 'string') {
-                        const lines = rawLyrics.split('\n');
-                        const timeReg = /\[(\d{2}):(\d{2}(?:\.\d{1,3})?)\]/;
-                        
-                        lines.forEach(line => {
-                            const match = timeReg.exec(line);
-                            if (match) {
-                                const min = parseInt(match[1], 10);
-                                const sec = parseFloat(match[2]);
-                                const lineTime = min * 60 + sec;
-                                
-                                // Base line text
-                                let text = line.replace(timeReg, '').trim();
-                                let isBgVocal = false;
+                if (rawLyrics && typeof rawLyrics === 'string') {
+                    const lines = rawLyrics.split('\n');
+                    const lineTimeReg = /\[(\d{2}:\d{2}(?:\.\d{1,3})?)\]/;
+                    const wordTagReg = /<(\d{2}:\d{2}(?:\.\d{1,3})?)>/g;
+                    
+                    lines.forEach(line => {
+                        const lineMatch = lineTimeReg.exec(line);
+                        if (lineMatch) {
+                            const lineTime = parseLrcTime(lineMatch[1]);
+                            let text = line.replace(lineTimeReg, '').trim();
+                            
+                            let isBgVocal = false;
+                            // Extract metadata tags
+                            text = text.replace(/\{([^}]+)\}/g, (match, content) => {
+                                if (content.toLowerCase().includes('bg')) isBgVocal = true;
+                                return '';
+                            }).trim();
 
-                                // 1. Check for {agent} or {bg} extended tags and remove them from text
-                                text = text.replace(/\{([^}]+)\}/g, (fullMatch, tagContent) => {
-                                    const tag = tagContent.toLowerCase();
-                                    if (tag.includes('bg')) { // Targets {bg} or {agent:bg}
-                                        isBgVocal = true;
-                                    }
-                                    return ''; // Remove tag from visible string
-                                }).trim();
-
-                                // 2. Parse Word-by-Word sync tags: e.g. <00:15.50>
-                                const wordTimeReg = /<(\d{2}):(\d{2}(?:\.\d{1,3})?)>/g;
-                                let words = [];
-                                
-                                if (wordTimeReg.test(text)) {
-                                    wordTimeReg.lastIndex = 0; // reset regex
-                                    let cleanText = "";
-                                    let wordMatch;
-                                    
-                                    while ((wordMatch = wordTimeReg.exec(text)) !== null) {
-                                        const wMin = parseInt(wordMatch[1], 10);
-                                        const wSec = parseFloat(wordMatch[2]);
-                                        const wTime = wMin * 60 + wSec;
-                                        
-                                        // Snag the text that exists between this tag and the next tag
-                                        const nextMatchIndex = text.indexOf('<', wordTimeReg.lastIndex);
-                                        const endOfWord = nextMatchIndex !== -1 ? nextMatchIndex : text.length;
-                                        const wText = text.substring(wordTimeReg.lastIndex, endOfWord);
-                                        
-                                        words.push({ time: wTime, text: wText });
-                                        cleanText += wText;
-                                    }
-                                    text = cleanText; // fallback to clean text string for rendering 
+                            // Robust Word-by-Word Parsing
+                            let words = [];
+                            let rawWords = text.split(/(<\d{2}:\d{2}(?:\.\d{1,3})?>)/);
+                            
+                            // Iterate through segments to build timed objects
+                            let currentWordTime = lineTime; // Fallback to line start
+                            rawWords.forEach(segment => {
+                                if (segment.match(wordTagReg)) {
+                                    // It's a timestamp tag
+                                    currentWordTime = parseLrcTime(segment.replace(/[<>]/g, ''));
+                                } else if (segment.trim() !== "" || segment.length > 0) {
+                                    // It's actual text
+                                    words.push({ time: currentWordTime, text: segment });
                                 }
+                            });
 
-                                if (text) {
-                                    currentLyrics.push({ 
-                                        time: lineTime, 
-                                        text: text,
-                                        isBg: isBgVocal,
-                                        words: words.length > 0 ? words : null
-                                    });
-                                }
+                            if (text) {
+                                currentLyrics.push({ 
+                                    time: lineTime, 
+                                    isBg: isBgVocal,
+                                    words: words.length > 0 ? words : null,
+                                    text: words.length === 0 ? text : null 
+                                });
                             }
-                        });
-                    }
+                        }
+                    });
                 }
 
                 lyricsScroll.innerHTML = '';
-                
                 if (currentLyrics.length > 0) {
                     currentLyrics.forEach((lyric, index) => {
                         const el = document.createElement('div');
                         el.className = 'lyric-line';
                         el.id = 'lyric-' + index;
+                        if (lyric.isBg) el.classList.add('bg-vocal');
 
-                        if (lyric.isBg) {
-                            el.classList.add('bg-vocal');
-                        }
-
-                        // If word sync data is present, wrap each word in a span
                         if (lyric.words) {
                             el.classList.add('has-words');
                             lyric.words.forEach((word, wIndex) => {
@@ -665,10 +637,8 @@
                                 el.appendChild(span);
                             });
                         } else {
-                            // Otherwise just set standard text
                             el.innerText = lyric.text;
                         }
-
                         lyricsScroll.appendChild(el);
                     });
                 } else {
@@ -676,16 +646,12 @@
                 }
                 
                 lyricsScroll.style.transform = 'translateY(0px)';
-
                 const mainLayout = document.getElementById('main-layout');
                 const lyricsBtn = document.getElementById('ui-btn-lyrics');
                 
                 if (isLyricsVisible) {
                     mainLayout.classList.add('has-lyrics');
                     lyricsBtn.classList.add('active');
-                } else {
-                    mainLayout.classList.remove('has-lyrics');
-                    lyricsBtn.classList.remove('active');
                 }
             }
 
@@ -693,6 +659,7 @@
                 if (currentLyrics.length === 0) return;
 
                 let newIndex = -1;
+                // Find the index of the line that should be active based on currentTime
                 for (let i = 0; i < currentLyrics.length; i++) {
                     if (currentTime >= currentLyrics[i].time) {
                         newIndex = i;
@@ -701,7 +668,7 @@
                     }
                 }
 
-                // Handle Word-by-word highlights if applicable
+                // Update Word Highlights
                 if (newIndex !== -1 && currentLyrics[newIndex].words) {
                     const activeLyric = currentLyrics[newIndex];
                     activeLyric.words.forEach((word, wIndex) => {
@@ -716,7 +683,7 @@
                     });
                 }
 
-                // Handle line-level active state and scrolling
+                // Update Active Line Highlight and Scroll
                 if (newIndex !== activeLyricIndex) {
                     if (activeLyricIndex !== -1) {
                         const oldEl = document.getElementById('lyric-' + activeLyricIndex);
@@ -743,14 +710,11 @@
 
             const options = new cast.framework.CastReceiverOptions();
             options.disableIdleTimeout = true;
-            
             const uiConfig = new cast.framework.ui.UiConfig();
             uiConfig.touchScreenOptimizedApp = false;
             options.uiConfig = uiConfig;
-            
             options.customNamespaces = Object.assign({});
             cast.framework.CastReceiverContext.getInstance().setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
-            
             context.start(options);
 
             try {
