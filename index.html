@@ -385,8 +385,8 @@
     <cast-media-player></cast-media-player>
     
     <div class="custom-overlay">
-        <!-- Bumped to v1.2.7 for robust parsing and smooth requestAnimationFrame sync -->
-        <div class="version-tag">v1.2.7</div>
+        <!-- Bumped to v1.2.8 for overlapping multi-line highlighting support -->
+        <div class="version-tag">v1.2.8</div>
 
         <div class="main-layout" id="main-layout">
             
@@ -450,7 +450,7 @@
 
     <script>
         let currentLyrics = [];
-        let activeLyricIndex = -1;
+        let activeLyricIndices = []; 
         let isLyricsVisible = false; 
         let currentMediaId = null; 
         let syncAnimationId = null; // Used for high-framerate word highlights
@@ -480,12 +480,12 @@
 
                             const customData = mediaInfo.customData || {};
                             
-                            // Mocking the EXACT format provided, adjusted to start quickly for testing
-                            const mockLRC = `[00:01.00]{agent:v1}Uh, I see dead people, I need dead people
-<Uh,:1.000:1.300|I:2.000:2.300|see:2.300:2.600|dead:2.600:3.100|people,:3.100:4.100|I:4.100:4.400|need:4.400:4.700|dead:4.700:5.200|people:5.200:5.700>
-[00:06.00]{bg}Background Vocal Test
-<(Background:6.000:7.000|Vocal:7.000:8.000|Test):8.000:9.000>
-[00:10.00] Enjoy the updated Metrolist UI.`;
+                            // Mocking an overlapping structure to test real-time multi-line highlighting
+                            const mockLRC = `[00:01.00]{agent:v1}Generic lead vocal line
+<Generic:1.000:1.300|lead:1.400:1.700|vocal:1.700:2.200|line:2.200:3.000>
+[00:01.00]{bg}(Background overlap)
+<(Background:1.500:2.000|overlap):2.000:3.000>
+[00:05.00] Enjoy the fully synced Metrolist UI.`;
                             
                             const rawLyrics = customData.lyrics ? customData.lyrics : mockLRC; 
                             setupLyrics(rawLyrics);
@@ -603,7 +603,7 @@
 
             function setupLyrics(rawLyrics) {
                 currentLyrics = [];
-                activeLyricIndex = -1;
+                activeLyricIndices = [];
                 const lyricsScroll = document.getElementById('lyrics-scroll');
 
                 if (rawLyrics && typeof rawLyrics === 'string') {
@@ -705,59 +705,88 @@
             function syncLyricsToTime(currentTime) {
                 if (currentLyrics.length === 0) return;
 
-                let newIndex = -1;
+                let newActiveIndices = [];
+
                 for (let i = 0; i < currentLyrics.length; i++) {
-                    if (currentTime >= currentLyrics[i].time) {
-                        newIndex = i;
+                    const lyric = currentLyrics[i];
+                    
+                    if (lyric.words && lyric.words.length > 0) {
+                        const lastWordEnd = lyric.words[lyric.words.length - 1].end;
+                        // Stay active until slightly after the last word is sung
+                        if (currentTime >= lyric.time && currentTime <= lastWordEnd + 0.5) {
+                            newActiveIndices.push(i);
+                        }
                     } else {
-                        break;
+                        // Standard LRC logic: stay active until the next line
+                        let nextTime = Infinity;
+                        for (let j = i + 1; j < currentLyrics.length; j++) {
+                            if (currentLyrics[j].time > lyric.time) {
+                                nextTime = currentLyrics[j].time;
+                                break;
+                            }
+                        }
+                        if (currentTime >= lyric.time && currentTime < nextTime) {
+                            newActiveIndices.push(i);
+                        }
                     }
                 }
 
-                if (newIndex !== activeLyricIndex) {
-                    if (activeLyricIndex !== -1) {
-                        const oldEl = document.getElementById('lyric-' + activeLyricIndex);
+                // Turn off old lines
+                activeLyricIndices.forEach(index => {
+                    if (!newActiveIndices.includes(index)) {
+                        const oldEl = document.getElementById('lyric-' + index);
                         if (oldEl) {
                             oldEl.classList.remove('active');
-                            if (currentLyrics[activeLyricIndex].words) {
+                            if (currentLyrics[index].words) {
                                 const wordSpans = oldEl.querySelectorAll('.lyric-word');
                                 wordSpans.forEach(span => span.classList.remove('passed'));
                             }
                         }
                     }
+                });
+
+                // Turn on new lines and evaluate words
+                newActiveIndices.forEach(index => {
+                    if (!activeLyricIndices.includes(index)) {
+                        const newEl = document.getElementById('lyric-' + index);
+                        if (newEl) newEl.classList.add('active');
+                    }
                     
-                    activeLyricIndex = newIndex;
+                    if (currentLyrics[index].words) {
+                        currentLyrics[index].words.forEach((word, wIndex) => {
+                            const wordEl = document.getElementById(`lyric-${index}-word-${wIndex}`);
+                            if (wordEl) {
+                                if (currentTime >= word.start) {
+                                    wordEl.classList.add('passed');
+                                } else {
+                                    wordEl.classList.remove('passed');
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // Scroll to the first active line in the group
+                if (newActiveIndices.length > 0) {
+                    const changed = activeLyricIndices.length !== newActiveIndices.length || 
+                                    !activeLyricIndices.every((val, i) => val === newActiveIndices[i]);
                     
-                    if (activeLyricIndex !== -1) {
-                        const newEl = document.getElementById('lyric-' + activeLyricIndex);
-                        if (newEl) {
-                            newEl.classList.add('active');
+                    if (changed) {
+                        const firstEl = document.getElementById('lyric-' + newActiveIndices[0]);
+                        if (firstEl) {
                             const container = document.getElementById('lyrics-container');
                             const lyricsScroll = document.getElementById('lyrics-scroll');
                             const safeContainerHeight = container.clientHeight || 400; 
-                            const scrollOffset = newEl.offsetTop - (safeContainerHeight / 2) + (newEl.clientHeight / 2);
+                            const scrollOffset = firstEl.offsetTop - (safeContainerHeight / 2) + (firstEl.clientHeight / 2);
                             lyricsScroll.style.transform = `translateY(-${scrollOffset}px)`;
                         }
-                    } else {
-                        const lyricsScroll = document.getElementById('lyrics-scroll');
-                        lyricsScroll.style.transform = 'translateY(0px)';
                     }
+                } else if (currentTime < currentLyrics[0].time) {
+                    const lyricsScroll = document.getElementById('lyrics-scroll');
+                    if (lyricsScroll) lyricsScroll.style.transform = 'translateY(0px)';
                 }
 
-                // High-framerate evaluation of word-by-word highlights
-                if (activeLyricIndex !== -1 && currentLyrics[activeLyricIndex].words) {
-                    const activeLyric = currentLyrics[activeLyricIndex];
-                    activeLyric.words.forEach((word, wIndex) => {
-                        const wordEl = document.getElementById(`lyric-${activeLyricIndex}-word-${wIndex}`);
-                        if (wordEl) {
-                            if (currentTime >= word.start) {
-                                wordEl.classList.add('passed');
-                            } else {
-                                wordEl.classList.remove('passed');
-                            }
-                        }
-                    });
-                }
+                activeLyricIndices = newActiveIndices;
             }
 
             const options = new cast.framework.CastReceiverOptions();
