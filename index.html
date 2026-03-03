@@ -24,7 +24,6 @@
             color: var(--md-sys-color-on-background);
         }
 
-        /* Hide default Cast & Smart Display UI elements */
         cast-media-player, 
         touch-controls,
         goog-audio-player-compatibility {
@@ -39,19 +38,20 @@
             pointer-events: none !important;
         }
 
-        /* Version Tag Styling */
         .version-tag {
             position: absolute;
             bottom: 12px;
             left: 12px;
             font-size: 10px;
             color: var(--md-sys-color-text-muted);
-            opacity: 0.4;
+            opacity: 0.6;
             z-index: 2147483647;
             pointer-events: none;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
-        /* Base Full-Screen Overlay */
         .custom-overlay {
             position: absolute;
             top: 0;
@@ -62,7 +62,6 @@
             background-color: var(--md-sys-color-background);
         }
 
-        /* The master container for the split view */
         .main-layout {
             display: flex;
             flex-direction: row;
@@ -72,7 +71,6 @@
             justify-content: space-between;
         }
 
-        /* --- LEFT SIDE: PLAYER SECTION --- */
         .player-section {
             display: flex;
             flex-direction: column;
@@ -324,20 +322,17 @@
             font-weight: 700;
             color: var(--md-sys-color-text-muted);
             margin: 0;
-            opacity: 0.35;
-            transition: opacity 0.3s ease, color 0.3s ease, transform 0.3s ease;
+            opacity: 0.25;
+            transition: opacity 0.4s ease, color 0.4s ease, transform 0.4s ease;
             transform-origin: left center;
             line-height: 1.3;
+            text-align: left;
         }
 
         .lyric-line.active {
-            opacity: 1;
-            transform: scale(1.05);
-        }
-
-        /* Highlight whole line if no words sync data */
-        .lyric-line.active:not(.has-words) {
+            opacity: 1 !important;
             color: var(--md-sys-color-on-background);
+            transform: scale(1.05);
         }
 
         .lyric-line.bg-vocal {
@@ -350,28 +345,8 @@
             transform-origin: right center;
         }
 
-        .lyric-line.bg-vocal.active:not(.has-words) {
+        .lyric-line.bg-vocal.active {
             color: var(--md-sys-color-primary);
-        }
-
-        /* --- WORD-BY-WORD SYNC STYLING --- */
-        .lyric-word {
-            color: inherit; 
-            transition: color 0.15s ease;
-        }
-
-        /* Dim words in the active line until they are reached */
-        .lyric-line.active.has-words .lyric-word {
-            color: rgba(255, 255, 255, 0.35); 
-        }
-
-        .lyric-line.active.has-words .lyric-word.passed {
-            color: var(--md-sys-color-on-background);
-        }
-
-        /* Background vocals use primary color for highlight */
-        .lyric-line.bg-vocal.active.has-words .lyric-word.passed {
-            color: var(--md-sys-color-primary); 
         }
 
         .lyric-placeholder {
@@ -390,8 +365,8 @@
     <cast-media-player></cast-media-player>
     
     <div class="custom-overlay">
-        <!-- Version marker for cache verification -->
-        <div class="version-tag">v1.2.4</div>
+        <!-- Bumped to v1.2.5 to focus on highlighting logic -->
+        <div class="version-tag">v1.2.5</div>
 
         <div class="main-layout" id="main-layout">
             
@@ -484,7 +459,8 @@
                             }
 
                             const customData = mediaInfo.customData || {};
-                            const mockLRC = `[00:01.00] {agent:v1} <00:01.00> Music <00:01.50> Playing\n[00:05.00] This is a line before background vocals\n[00:08.50] {bg} <00:08.50> (Background <00:09.50> Vocal <00:10.50> Highlight)\n[00:12.00] {agent:v1} <00:12.00> Word <00:12.40> by <00:12.80> word <00:13.20> highlighting <00:13.60> active\n[00:16.00] {bg} (Another backing vocal line)\n[00:20.00] Enjoy the updated Metrolist UI.`;
+                            // Mocking the {bg} sequence correctly to test line-level highlighting
+                            const mockLRC = `[00:01.00] {agent:v1} Music Playing\n[00:05.00] This is a line before background vocals\n[00:08.50] {bg} (Background Vocal Highlight)\n[00:12.00] {agent:v1} Line after background vocal\n[00:16.00] {bg} (Another backing vocal line)\n[00:20.00] Enjoy the updated Metrolist UI.`;
                             
                             const rawLyrics = customData.lyrics ? customData.lyrics : mockLRC; 
                             setupLyrics(rawLyrics);
@@ -560,6 +536,7 @@
                 if (isLyricsVisible) {
                     mainLayout.classList.add('has-lyrics');
                     lyricsBtn.classList.add('active');
+                    // Instant sync on open
                     syncLyricsToTime(currentMediaTime);
                 } else {
                     mainLayout.classList.remove('has-lyrics');
@@ -590,7 +567,6 @@
                 if (rawLyrics && typeof rawLyrics === 'string') {
                     const lines = rawLyrics.split('\n');
                     const lineTimeReg = /\[(\d{2}:\d{2}(?:\.\d{1,3})?)\]/;
-                    const wordTagReg = /<(\d{2}:\d{2}(?:\.\d{1,3})?)>/g;
                     
                     lines.forEach(line => {
                         const lineMatch = lineTimeReg.exec(line);
@@ -599,29 +575,20 @@
                             let text = line.replace(lineTimeReg, '').trim();
                             
                             let isBgVocal = false;
+                            // Pre-process extended tags
                             text = text.replace(/\{([^}]+)\}/g, (match, content) => {
                                 if (content.toLowerCase().includes('bg')) isBgVocal = true;
                                 return '';
                             }).trim();
 
-                            let words = [];
-                            let rawWords = text.split(/(<\d{2}:\d{2}(?:\.\d{1,3})?>)/);
-                            
-                            let currentWordTime = lineTime; 
-                            rawWords.forEach(segment => {
-                                if (segment.match(wordTagReg)) {
-                                    currentWordTime = parseLrcTime(segment.replace(/[<>]/g, ''));
-                                } else if (segment.trim() !== "" || segment.length > 0) {
-                                    words.push({ time: currentWordTime, text: segment });
-                                }
-                            });
+                            // Strip out any word-by-word tags for this iteration
+                            text = text.replace(/<[^>]+>/g, '').trim();
 
                             if (text) {
                                 currentLyrics.push({ 
                                     time: lineTime, 
                                     isBg: isBgVocal,
-                                    words: words.length > 0 ? words : null,
-                                    text: words.length === 0 ? text : null 
+                                    text: text 
                                 });
                             }
                         }
@@ -635,19 +602,7 @@
                         el.className = 'lyric-line';
                         el.id = 'lyric-' + index;
                         if (lyric.isBg) el.classList.add('bg-vocal');
-
-                        if (lyric.words) {
-                            el.classList.add('has-words');
-                            lyric.words.forEach((word, wIndex) => {
-                                const span = document.createElement('span');
-                                span.className = 'lyric-word';
-                                span.id = `lyric-${index}-word-${wIndex}`;
-                                span.innerText = word.text;
-                                el.appendChild(span);
-                            });
-                        } else {
-                            el.innerText = lyric.text;
-                        }
+                        el.innerText = lyric.text;
                         lyricsScroll.appendChild(el);
                     });
                 } else {
@@ -667,48 +622,44 @@
             function syncLyricsToTime(currentTime) {
                 if (currentLyrics.length === 0) return;
 
+                // Find the index of the line whose timestamp is the closest to current without going over.
                 let newIndex = -1;
                 for (let i = 0; i < currentLyrics.length; i++) {
                     if (currentTime >= currentLyrics[i].time) {
                         newIndex = i;
                     } else {
+                        // We found a time in the future, so the previous index was our match.
                         break;
                     }
                 }
 
-                if (newIndex !== -1 && currentLyrics[newIndex].words) {
-                    const activeLyric = currentLyrics[newIndex];
-                    activeLyric.words.forEach((word, wIndex) => {
-                        const wordEl = document.getElementById(`lyric-${newIndex}-word-${wIndex}`);
-                        if (wordEl) {
-                            if (currentTime >= word.time) {
-                                wordEl.classList.add('passed');
-                            } else {
-                                wordEl.classList.remove('passed');
-                            }
-                        }
-                    });
-                }
-
+                // If the active index has changed, update DOM
                 if (newIndex !== activeLyricIndex) {
+                    // Remove active class from previous
                     if (activeLyricIndex !== -1) {
                         const oldEl = document.getElementById('lyric-' + activeLyricIndex);
                         if (oldEl) oldEl.classList.remove('active');
                     }
                     
                     activeLyricIndex = newIndex;
-                    const lyricsScroll = document.getElementById('lyrics-scroll');
-
+                    
                     if (activeLyricIndex !== -1) {
                         const newEl = document.getElementById('lyric-' + activeLyricIndex);
                         if (newEl) {
                             newEl.classList.add('active');
+                            
+                            // Scroll logic
                             const container = document.getElementById('lyrics-container');
+                            const lyricsScroll = document.getElementById('lyrics-scroll');
                             const safeContainerHeight = container.clientHeight || 400; 
+                            
+                            // Calculate offset to center the line
                             const scrollOffset = newEl.offsetTop - (safeContainerHeight / 2) + (newEl.clientHeight / 2);
                             lyricsScroll.style.transform = `translateY(-${scrollOffset}px)`;
                         }
                     } else {
+                        // Reset if no line is active
+                        const lyricsScroll = document.getElementById('lyrics-scroll');
                         lyricsScroll.style.transform = 'translateY(0px)';
                     }
                 }
