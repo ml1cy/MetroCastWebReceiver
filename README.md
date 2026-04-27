@@ -1,7 +1,7 @@
 # MetroCastWebReceiver
 
 A custom Google Cast Web Receiver UI for MetroList, built as a single static app and deployed on Cloudflare.<br>
-You can see a functional example at [cast.1cylab.tech](https://cast.1cylab.tech)
+You can see a non-functional example at [cast.1cylab.tech](https://cast.1cylab.tech)
 
 It provides a full-screen now-playing experience with:
 - album art, title, artist, and playback progress
@@ -11,7 +11,7 @@ It provides a full-screen now-playing experience with:
 
 ---
 
-## ✨ Highlights
+##  Highlights
 
 - **Custom Cast receiver overlay** (default CAF UI is hidden)
 - **Responsive TV-friendly layout** with large typography and touch-safe controls
@@ -25,7 +25,7 @@ It provides a full-screen now-playing experience with:
 
 ---
 
-## 🧱 Tech Stack
+##  Tech Stack
 
 - **HTML + CSS + Vanilla JavaScript** (single-file app in `index.html`)
 - **Google Cast CAF Receiver SDK**
@@ -33,7 +33,7 @@ It provides a full-screen now-playing experience with:
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```text
 .
@@ -46,7 +46,7 @@ It provides a full-screen now-playing experience with:
 
 ---
 
-## 🚀 Running Locally
+##  Running Locally
 
 ### Prerequisites
 
@@ -71,7 +71,7 @@ Wrangler serves the static assets in this project (`assets.directory = "."`).
 
 ---
 
-## ☁️ Deploy
+##  Deploy
 
 Authenticate and deploy:
 
@@ -84,7 +84,7 @@ After deployment, use the hosted HTTPS receiver URL when configuring your Google
 
 ---
 
-## 🎵 Expected Media Payload
+##  Expected Media Payload
 
 This receiver reads metadata and optional lyrics from the Cast media payload:
 
@@ -97,7 +97,7 @@ If `customData.lyrics` is missing, the UI uses an internal mock lyric block for 
 
 ---
 
-## 📝 Lyrics Format (Supported)
+##  Lyrics Format (Supported)
 
 Example:
 
@@ -115,7 +115,7 @@ Notes:
 
 ---
 
-## 🛠️ Configuration
+##  Configuration
 
 Primary runtime settings are in `wrangler.jsonc`:
 
@@ -125,7 +125,7 @@ Primary runtime settings are in `wrangler.jsonc`:
 
 ---
 
-## 📌 Notes
+##  Notes
 
 - The app intentionally disables/hides default CAF visual components and renders a custom overlay.
 - Idle timeout is disabled in receiver options for persistent display behavior.
